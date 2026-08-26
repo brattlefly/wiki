@@ -16,10 +16,11 @@ No local setup, no git command line required for quick edits — GitHub's web ed
 
 ## Sections
 
+- **[Urgent Items](urgent-items.md)** — running to-do list for things that need attention soon
 - **[Entities & Legal](entities-legal.md)** — BrattleFly LLC, Son of Jud LLC, lease, contacts
 - **[Brand & Voice](brand-voice.md)** — standing rules, voice guidelines
 - **[People](people.md)** — guides, partners, contacts
-- **[Operations](operations.md)** — booking platform, POS, accounting, inventory
+-  **[Operations](operations.md)** — booking platform, POS, accounting, inventory
 - **[Marketing & Media](marketing-media.md)** — ad accounts, BrattleFly Media projects
 - **[Roadmap](roadmap.md)** — open initiatives and what's on the horizon
 
