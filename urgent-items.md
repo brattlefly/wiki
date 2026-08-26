@@ -7,6 +7,9 @@ Running to-do list for things that need attention soon. To manage it: edit this 
 - [ ] Acquire flies
 - [ ] Clean up the space
 - [ ] Contact Diamondback about a display
+- [ ] Acquire terminal tackle
+- [ ] Discuss paid instructional event with Brew
+- [ ] Organize Kids Fishing Club
 
 ## Done recently
 
