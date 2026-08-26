@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Edit Urgent Items — BrattleFly Wiki</title>
+<style>
+  :root { --accent:#2c4a3e; --bg:#0d1117; --fg:#c9d1d9; --card:#161b22; --border:#30363d; --muted:#8b949e; }
+  body { background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; max-width:700px; margin:40px auto; padding:0 20px 60px; }
+  h1 { color:#fff; font-size:24px; }
+  h2 { color:#fff; font-size:16px; margin-top:0; }
+  a { color:#58a6ff; }
+  .section { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:20px; }
+  .item { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .item:last-child { border-bottom:none; }
+  .item label { flex:1; }
+  .item.done label { text-decoration:line-through; color:var(--muted); }
+  button { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:7px 14px; cursor:pointer; font-size:14px; }
+  button.secondary { background:#21262d; border:1px solid var(--border); }
+  button.danger { background:#442726; }
+  .empty { color:var(--muted); font-style:italic; margin:0; }
+  .add-row { display:flex; gap:8px; margin-top:12px; }
+  .add-row input { flex:1; background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:var(--fg); font-size:14px; }
+  .token-box { font-size:13px; color:var(--muted); }
+  .token-box input[type=password] { width:100%; background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:7px; color:var(--fg); margin:6px 0; box-sizing:border-box; }
+  #status { margin:14px 0; font-size:14px; min-height:20px; }
+</style>
+</head>
+<body>
+
+<p><a href="https://brattlefly.github.io/wiki/#/urgent-items">&larr; back to wiki view</a></p>
+<h1>Urgent Items — Edit</h1>
+
+<div class="section">
+  <h2>Open</h2>
+  <div id="open-list"></div>
+  <div class="add-row">
+    <input id="new-item" type="text" placeholder="Add a new item…">
+    <button onclick="addItem()">Add</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Done recently</h2>
+  <div id="done-list"></div>
+</div>
+
+<div class="section token-box">
+  <strong style="color:var(--fg)">GitHub token</strong> — a fine-grained personal access token scoped to just the <code>brattlefly/wiki</code> repo, with "Contents: Read and write" permission only. Stored in this browser only; never sent anywhere but api.github.com.
+  <input id="token" type="password" placeholder="github_pat_...">
+  <label><input type="checkbox" id="remember"> remember in this browser</label>
+</div>
+
+<button onclick="save()">Save to GitHub</button>
+<div id="status"></div>
+
+<script>
+const REPO = 'brattlefly/wiki';
+const FILE = 'urgent-items.md';
+let sha = null;
+let openItems = [];
+let doneItems = [];
+
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(atob(str).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+function b64EncodeUnicode(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode('0x' + p1)));
+}
+
+function parseMarkdown(text) {
+  const lines = text.split('\n');
+  openItems = [];
+  doneItems = [];
+  let section = null;
+  for (const line of lines) {
+    if (/^##\s+Open/i.test(line)) { section = 'open'; continue; }
+    if (/^##\s+Done/i.test(line)) { section = 'done'; continue; }
+    if (/^##\s+/.test(line)) { section = null; continue; }
+    const m = line.match(/^-\s\[( |x|X)\]\s(.+)$/);
+    if (m && section) {
+      const itemText = m[2].trim();
+      if (itemText.startsWith('(') && itemText.endsWith(')')) continue;
+      const item = { text: itemText };
+      if (section === 'open') openItems.push(item); else doneItems.push(item);
+    }
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function render() {
+  const openEl = document.getElementById('open-list');
+  const doneEl = document.getElementById('done-list');
+  openEl.innerHTML = '';
+  doneEl.innerHTML = '';
+
+  openItems.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = `<input type="checkbox" onchange="completeItem(${i})" title="Mark done">
+      <label>${escapeHtml(item.text)}</label>
+      <button class="danger" onclick="removeItem('open', ${i})">Delete</button>`;
+    openEl.appendChild(row);
+  });
+  if (openItems.length === 0) openEl.innerHTML = '<p class="empty">Nothing open.</p>';
+
+  doneItems.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'item done';
+    row.innerHTML = `<label>${escapeHtml(item.text)}</label>
+      <button class="secondary" onclick="reopenItem(${i})">Reopen</button>
+      <button class="danger" onclick="removeItem('done', ${i})">Delete</button>`;
+    doneEl.appendChild(row);
+  });
+  if (doneItems.length === 0) doneEl.innerHTML = '<p class="empty">Nothing here.</p>';
+}
+
+function addItem() {
+  const input = document.getElementById('new-item');
+  const text = input.value.trim();
+  if (!text) return;
+  openItems.push({ text });
+  input.value = '';
+  render();
+}
+
+function completeItem(i) {
+  const item = openItems.splice(i, 1)[0];
+  doneItems.unshift(item);
+  render();
+}
+
+function reopenItem(i) {
+  const item = doneItems.splice(i, 1)[0];
+  openItems.push(item);
+  render();
+}
+
+function removeItem(section, i) {
+  if (section === 'open') openItems.splice(i, 1);
+  else doneItems.splice(i, 1);
+  render();
+}
+
+function buildMarkdown() {
+  let md = "# Urgent Items\n\nRunning to-do list for things that need attention soon. To manage it: edit this file, check items off by changing `- [ ]` to `- [x]`, and delete items once they're actually resolved (don't let done items pile up here).\n\n## Open\n\n";
+  md += openItems.length ? openItems.map(i => `- [ ] ${i.text}\n`).join('') : '- [ ] (add items here)\n';
+  md += "\n## Done recently\n\n";
+  md += doneItems.length ? doneItems.map(i => `- [x] ${i.text}\n`).join('') : '- [ ] (move checked-off items here for a bit before deleting, if useful)\n';
+  return md;
+}
+
+function setStatus(msg, isError) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.color = isError ? '#f85149' : '#8b949e';
+}
+
+async function load() {
+  setStatus('Loading…');
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${FILE}`, {
+      headers: { Accept: 'application/vnd.github+json' }
+    });
+    if (!res.ok) { setStatus('Failed to load file: ' + res.status, true); return; }
+    const data = await res.json();
+    sha = data.sha;
+    const text = b64DecodeUnicode(data.content.replace(/\n/g, ''));
+    parseMarkdown(text);
+    render();
+    setStatus('');
+  } catch (e) {
+    setStatus('Failed to load: ' + e.message, true);
+  }
+}
+
+async function save() {
+  const tokenInput = document.getElementById('token');
+  let token = tokenInput.value.trim();
+  if (!token) token = localStorage.getItem('gh_urgent_items_token') || '';
+  if (!token) { setStatus('Enter a GitHub token first.', true); return; }
+  if (document.getElementById('remember').checked) {
+    localStorage.setItem('gh_urgent_items_token', token);
+  }
+  setStatus('Saving…');
+  try {
+    const md = buildMarkdown();
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${FILE}`, {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        message: 'Update urgent-items.md via editor',
+        content: b64EncodeUnicode(md),
+        sha: sha
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatus('Save failed: ' + (err.message || res.status), true);
+      return;
+    }
+    const data = await res.json();
+    sha = data.content.sha;
+    setStatus('Saved — live on the site within a minute or two.');
+  } catch (e) {
+    setStatus('Save failed: ' + e.message, true);
+  }
+}
+
+const saved = localStorage.getItem('gh_urgent_items_token');
+if (saved) {
+  document.getElementById('token').value = saved;
+  document.getElementById('remember').checked = true;
+}
+load();
+</script>
+</body>
+</html>
