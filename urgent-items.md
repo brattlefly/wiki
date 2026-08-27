@@ -10,6 +10,7 @@ Running to-do list for things that need attention soon. To manage it: edit this 
 - [ ] Discuss paid instructional event with Brew
 - [ ] Organize Kids Fishing Club
 - [ ] Acquire flies
+- [ ] Arrange boat video shoot
 
 ## Done recently
 
