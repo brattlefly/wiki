@@ -11,6 +11,7 @@ Running to-do list for things that need attention soon. To manage it: edit this 
 - [ ] Organize Kids Fishing Club
 - [ ] Acquire flies
 - [ ] Arrange boat video shoot
+- [ ] Monthly Fly Tying
 
 ## Done recently
 
